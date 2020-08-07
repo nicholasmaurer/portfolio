@@ -1,10 +1,10 @@
 import React, { Component } from "react";
 import ReactDOM from "react-dom";
 import * as THREE from 'three';
-import {OrbitControls} from "three/examples/jsm/controls/OrbitControls";
+// import {OrbitControls} from "three/examples/jsm/controls/OrbitControls";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
 
-class ThreeScene extends Component {
+class Scene extends Component {
 
     constructor(props){
         super(props);
@@ -54,11 +54,11 @@ class ThreeScene extends Component {
             1000 // far plane
         );
 
-        this.controls = new OrbitControls( this.camera, this.el );
-
-        // after that this.controls might be used for enabling/disabling zoom:
-        this.controls.enableZoom = true;
-        this.controls.enabled = false;
+        // this.controls = new OrbitControls( this.camera, this.el );
+        //
+        // // after that this.controls might be used for enabling/disabling zoom:
+        // this.controls.enableZoom = true;
+        // this.controls.enabled = false;
 
 
         // set some distance from a cube that is located at z = 0
@@ -107,4 +107,4 @@ class ThreeScene extends Component {
     }
 }
 
-export default ThreeScene
+export default Scene
