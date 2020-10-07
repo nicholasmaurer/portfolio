@@ -1,7 +1,8 @@
 import React, { Component } from "react";
 import * as THREE from 'three';
-import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
 import * as dat from 'dat.gui';
+import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
+import ExampleCurves from './exampleCurves';
 
 class Scene extends Component {
 
@@ -46,15 +47,25 @@ class Scene extends Component {
             75, // fov = field of view
             width / height, // aspect ratio
             0.1, // near plane
-            1000 // far plane
+            10000// far plane
         );
-        this.camera.position.set(0,200,-50);
+        this.camera.position.set(0,400,0);
         this.camera.rotation.set(-90,0,0);
 
         this.renderer = new THREE.WebGLRenderer({alpha : true});
         this.renderer.setClearColor( 0x000000, 0); // the default
         this.renderer.setSize( width, height );
         this.el.appendChild( this.renderer.domElement ); // mount using React ref
+
+        // include debug gizmos
+        var newPositions = [
+            new THREE.Vector3( 50, 200, 150),
+            new THREE.Vector3( 100, 200, 0),
+            new THREE.Vector3( -50, 200, -100),
+            new THREE.Vector3( 50, 200, 150),
+        ];
+        this.splines = ExampleCurves(this.el, this.camera, this.scene, this.renderer, newPositions);
+        console.log('splines', this.splines);
 
         // load gltf file
         this.loaded = false;
@@ -90,11 +101,9 @@ class Scene extends Component {
                 this.scene.add(clone);
                 //TODO: scale bone along curve
             }
-            this.forwardScalar = 1;
-            this.lateralScalar = 1;
-            this.distanceDelta = 1;
-            // curve to define tail object size
+
             this.target = new THREE.Vector3();
+
         } );
 
 
@@ -102,18 +111,31 @@ class Scene extends Component {
         // clock to get frame times for animation
         this.clock = new THREE.Clock();
 
-        // Creating a GUI
-        this.gui = new dat.GUI();
-        this.position = {x:0, y:0, z:0};
-        this.gui.add(this.position, 'x').onChange((value)=>{
-            this.position.x = value;
-        });
-        this.gui.add(this.position, 'y').onChange((value)=>{
-            this.position.y = value;
-        });;
-        this.gui.add(this.position, 'z').onChange((value)=>{
-            this.position.z = value;
-        });;
+        // // Creating a GUI
+        // this.gui = new dat.GUI();
+        //
+        // this.position = {posX:0, posY:0, posZ:0};
+        // this.gui.add(this.position, 'posX').onChange((value)=>{
+        //     this.position.posX = value;
+        // });
+        // this.gui.add(this.position, 'posY').onChange((value)=>{
+        //     this.position.posY = value;
+        // });
+        // this.gui.add(this.position, 'posZ').onChange((value)=>{
+        //     this.position.posZ = value;
+        // });
+        //
+        // this.rotation = {rotX:0, rotY:0, rotZ:0};
+        // this.gui.add(this.rotation, 'rotX').onChange((value)=>{
+        //     this.rotation.rotX = value;
+        // });
+        // this.gui.add(this.rotation, 'rotY').onChange((value)=>{
+        //     this.rotation.rotY = value;
+        // });
+        // this.gui.add(this.rotation, 'rotZ').onChange((value)=>{
+        //     this.rotation.rotZ = value;
+        // });
+
 
         this.pickPosition = {x: 0, y: 0};
         this.clearPickPosition();
@@ -122,8 +144,49 @@ class Scene extends Component {
         window.addEventListener('mousemove', this.setPickPosition);
         window.addEventListener('mouseout', this.clearPickPosition);
         window.addEventListener('mouseleave', this.clearPickPosition);
+        this.time = 0;
+    };
 
+    startAnimationLoop = () => {
+        this.renderer.render( this.scene, this.camera );
+        this.requestID = window.requestAnimationFrame(this.startAnimationLoop);
 
+        // console.log('pos', this.camera.position);
+        // console.log('rot', this.camera.rotation);
+
+        if(this.loaded){
+
+            if(this.time > 1)
+                this.time = 0;
+            this.time += this.clock.getDelta() * 0.1;
+            this.target = this.splines.uniform.getPoint(this.time)
+
+            // var normalizedPosition = this.pickPosition;
+            // this.raycaster = new THREE.Raycaster();
+            // // cast a ray through the frustum
+            // this.raycaster.setFromCamera(normalizedPosition, this.camera);
+            // var distance = new THREE.Vector3(this.camera.position.x, 0, this.camera.position.z);
+            // distance = distance.distanceTo(this.camera.position);
+            // this.raycaster.ray.at(distance, this.target);
+            this.head.lookAt(this.target);
+            this.head.position.set(this.target.x, this.target.y, this.target.z);
+            this.tail[1].lookAt(this.head.position);
+            var tailDistance = this.tail[1].position.distanceTo(this.head.position);
+            this.tail[1].translateZ(tailDistance);
+            for(var i = 2; i < this.boneCount; i++){
+                this.tail[i].lookAt(this.tail[i-1].position);
+                var boneDistance  = this.tail[i].position.distanceTo(this.tail[i-1].position);
+                var min = 0;
+                var max = boneDistance;
+                var t = THREE.MathUtils.mapLinear(tailDistance, min, max, 0, 1);
+                var value = THREE.MathUtils.lerp(0, max, t);
+                if(boneDistance > this.boneOffset)
+                    this.tail[i].translateZ(value);
+
+                console.log(tailDistance, boneDistance, this.boneOffset, t, value);
+
+            }
+        }
     };
 
     getCanvasRelativePosition = (event) => {
@@ -149,31 +212,7 @@ class Scene extends Component {
         this.pickPosition.y = -100000;
     }
 
-    startAnimationLoop = () => {
-        this.renderer.render( this.scene, this.camera );
-        this.requestID = window.requestAnimationFrame(this.startAnimationLoop);
 
-        if(this.loaded){
-            var normalizedPosition = this.pickPosition;
-            this.raycaster = new THREE.Raycaster();
-            // cast a ray through the frustum
-            this.raycaster.setFromCamera(normalizedPosition, this.camera);
-            var distance = new THREE.Vector3(this.camera.position.x, 0, this.camera.position.z);
-            distance = distance.distanceTo(this.camera.position);
-            this.raycaster.ray.at(distance, this.target);
-            // console.log(this.target);
-            var headDirection = this.target.sub(this.head.position);
-            headDirection.normalize();
-            this.head.translateOnAxis(headDirection, this.distanceDelta);
-            for(var i = 1; i < this.boneCount; i++){
-                var direction = new THREE.Vector3();
-                direction.subVectors(this.tail[i-1].position, this.tail[i].position).normalize();
-                if(this.tail[i].position.distanceTo(this.tail[i-1].position) > this.boneOffset){
-                    this.tail[i].translateOnAxis(direction, this.distanceDelta);
-                }
-            }
-        }
-    };
     render() {
         const three = {
             position : 'fixed',
@@ -185,7 +224,6 @@ class Scene extends Component {
             zIndex: '-1',
         };
         return(
-
             <div style={three} ref={ref => (this.el = ref)}/>
         );
     }
