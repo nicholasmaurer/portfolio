@@ -57,25 +57,24 @@ class Scene extends Component {
         this.renderer.setSize( width, height );
         this.el.appendChild( this.renderer.domElement ); // mount using React ref
 
-        // include debug gizmos
+        // curves
         var newPositions = [
-            new THREE.Vector3( 50, 200, 150),
+            new THREE.Vector3( 50, 200, 50),
             new THREE.Vector3( 100, 200, 0),
             new THREE.Vector3( -50, 200, -100),
-            new THREE.Vector3( 50, 200, 150),
+            new THREE.Vector3( 0, 200, 0),
         ];
-        this.splines = ExampleCurves(this.el, this.camera, this.scene, this.renderer, newPositions);
-        console.log('splines', this.splines);
+        this.curves = new ExampleCurves(this.el, this.camera, this.scene, this.renderer, newPositions, true);
+
 
         // load gltf file
         this.loaded = false;
         this.parent = null;
         const loader = new GLTFLoader().setPath( process.env.PUBLIC_URL );
         loader.load( 'python.gltf', (gltf)=> {
-            console.log("Loaded python.gltf");
-            console.log(gltf);
+            console.log("Loaded python.gltf", gltf);
             gltf.scene.traverse( ( child )=> {
-                console.log("gltf traverse: ", child.name);
+                console.log("gltf traverse mesh objects: ", child.name);
                 if ( child.isMesh ) {
                     const normalMaterial = new THREE.MeshNormalMaterial();
                     child.material = normalMaterial;
@@ -83,7 +82,6 @@ class Scene extends Component {
             } );
             this.scene.add(gltf.scene);
             this.parent = gltf.scene;
-            console.log(this.parent);
             this.loaded = true;
 
             this.head = this.scene.getObjectByName('head');
@@ -148,6 +146,7 @@ class Scene extends Component {
     };
 
     startAnimationLoop = () => {
+
         this.renderer.render( this.scene, this.camera );
         this.requestID = window.requestAnimationFrame(this.startAnimationLoop);
 
@@ -159,8 +158,7 @@ class Scene extends Component {
             if(this.time > 1)
                 this.time = 0;
             this.time += this.clock.getDelta() * 0.1;
-            this.target = this.splines.uniform.getPoint(this.time)
-
+            this.target = this.curves.curves.uniform.getPoint(this.time)
             // var normalizedPosition = this.pickPosition;
             // this.raycaster = new THREE.Raycaster();
             // // cast a ray through the frustum
@@ -183,7 +181,7 @@ class Scene extends Component {
                 if(boneDistance > this.boneOffset)
                     this.tail[i].translateZ(value);
 
-                console.log(tailDistance, boneDistance, this.boneOffset, t, value);
+                // console.log(tailDistance, boneDistance, this.boneOffset, t, value);
 
             }
         }
