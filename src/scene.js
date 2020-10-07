@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import * as dat from 'dat.gui';
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
 import ExampleCurves from './exampleCurves';
+import {MathUtils} from "three";
 
 class Scene extends Component {
 
@@ -11,65 +12,96 @@ class Scene extends Component {
         this.state = {
         };
     }
+
     componentDidMount() {
-        this.sceneSetup();
-        this.startAnimationLoop();
-        this.handleWindowResize();
 
-        window.addEventListener('resize', this.handleWindowResize);
-    }
-    componentWillUnmount() {
-        window.removeEventListener('resize', this.handleWindowResize);
-        window.cancelAnimationFrame(this.requestID);
+        // mouse events
+        var mouseDown = false;
+        var mouseEvent = null;
+        function onMouseDown( event ) {
+            mouseDown = true;
+            mouseEvent = event;
+        }
+        function onMouseUp( event ) {
+            mouseDown = false;
+            mouseEvent = event;
+        }
 
-    }
-    handleWindowResize = () => {
+        document.addEventListener( 'mousedown', onMouseDown);
+        document.addEventListener( 'mouseup', onMouseUp);
 
-        const width = window.innerWidth;
-        const height = window.outerHeight;
 
-        this.renderer.setSize( width, height );
-        this.camera.aspect = width / height;
-        this.camera.updateProjectionMatrix();
-
-        this.setState({
-            width: document.getElementById('root').clientWidth * 0.7,
-
-        });
-    };
-    sceneSetup = () => {
         // get container dimensions and use them for scene sizing
         const width = window.innerWidth;
         const height = window.innerHeight;
 
-        this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera(
             75, // fov = field of view
             width / height, // aspect ratio
             0.1, // near plane
             10000// far plane
         );
-        this.camera.position.set(0,400,0);
-        this.camera.rotation.set(-90,0,0);
+        camera.position.set(0,400,-300);
+        camera.rotation.set(-90,0,0);
 
-        this.renderer = new THREE.WebGLRenderer({alpha : true});
-        this.renderer.setClearColor( 0x000000, 0); // the default
-        this.renderer.setSize( width, height );
-        this.el.appendChild( this.renderer.domElement ); // mount using React ref
+        var renderer = new THREE.WebGLRenderer({alpha : true});
+        renderer.setClearColor( 0x000000, 0); // the default
+        renderer.setSize( width, height );
+        this.el.appendChild( renderer.domElement ); // mount using React ref
 
         // curves
-        var newPositions = [
-            new THREE.Vector3( 50, 200, 50),
-            new THREE.Vector3( 100, 200, 0),
-            new THREE.Vector3( -50, 200, -100),
-            new THREE.Vector3( 0, 200, 0),
+        // var snakePositions = [
+        //     new THREE.Vector3(-10.657144030829084, 211.99130690995395, 99.86265881127014),
+        //     new THREE.Vector3(-43.49690716512492, 225.10926097943525, 36.95996588601584),
+        //     new THREE.Vector3(24.821357073694088, 224.10441463693127, -26.866490091034876),
+        //     new THREE.Vector3(84.16861703024286, 205.36801053420552, -16.975468402584724),
+        //     new THREE.Vector3(69.61007822080799, 200, 54.33746486487491),
+        //     new THREE.Vector3(0.32706263537991886, 179.41271486533108, 51.48333485625092),
+        //     new THREE.Vector3(-17.28386229061062, 194.8205294571316, -40.359357678395355),
+        //     new THREE.Vector3(-31.380997129299487, 215.17788864263986, -104.65504944158074),
+        //     new THREE.Vector3(15.33207544746891, 136.65648842140624, -131.69671749171363),
+        //     new THREE.Vector3(97.18466693812094, 168.56383448805283, -128.7059712255733),
+        //     new THREE.Vector3(118.87331394182995, 215.17788864263986, -203.8980095499624),
+        //     new THREE.Vector3(104.49232632490069, 172.06872382886493, -267.90279002000716),
+        //     new THREE.Vector3(-8.699453378760792, 179.42908644393134, -274.64687039170155),
+        //     new THREE.Vector3(-7.668573284840512, 136.65648842140624, -224.0501500102585),
+        //     new THREE.Vector3(50.69356062981741, 187.21163987956413, -235.72970635208276),
+        //     new THREE.Vector3(41.89206398492601, 215.17788864263986, -302.3916893862612),
+        //     new THREE.Vector3(-27.868468878159902, 194.7515932463285, -313.58998612057064),
+        //     new THREE.Vector3(-96.21963197236764, 181.87482717275833, -274.3008383663488),
+        //     new THREE.Vector3(-53.68109588198873, 219.0416058969576, -210.12338385945162)
+        // ];
+        var scalePoints = [
+            new THREE.Vector3(0,0.35,0),
+            new THREE.Vector3(1,1,0),
+            new THREE.Vector3(2,1,0),
+            new THREE.Vector3(3,1,0),
+            new THREE.Vector3(4,0.4,0),
+            new THREE.Vector3(5,0.1,0),
         ];
-        this.curves = new ExampleCurves(this.el, this.camera, this.scene, this.renderer, newPositions, true);
+        var curve = new THREE.CatmullRomCurve3( scalePoints);
+        curve.curveType = 'catmullrom';
 
+        // debuggin curves
+        // this.curves = new ExampleCurves(this.el, camera, scene, renderer, scalePoints, true);
+        // this.curve = this.curves.curves.uniform;
+
+        var raycaster = new THREE.Raycaster();
+        var boxGeometry = new THREE.BoxBufferGeometry( 20, 20, 20);
+        var material = new THREE.MeshLambertMaterial( { color: '#000000'
+        } );
+        var object = new THREE.Mesh( boxGeometry, material );
+        scene.add(object);
+        object.visible = false;
 
         // load gltf file
-        this.loaded = false;
-        this.parent = null;
+        var loaded = false;
+        var head = null;
+        var tail = [];
+        var bone = null;
+        var boneCount = 100;
+        var boneOffset = 5;
         const loader = new GLTFLoader().setPath( process.env.PUBLIC_URL );
         loader.load( 'python.gltf', (gltf)=> {
             console.log("Loaded python.gltf", gltf);
@@ -80,136 +112,124 @@ class Scene extends Component {
                     child.material = normalMaterial;
                 }
             } );
-            this.scene.add(gltf.scene);
-            this.parent = gltf.scene;
-            this.loaded = true;
+            scene.add(gltf.scene);
+            raycaster.setFromCamera( new THREE.Vector2(1,-1), camera );
+            var rayPos = new THREE.Vector3();
+            raycaster.ray.at(400, rayPos);
+            object.position.set(rayPos.x, rayPos.y, rayPos.z);
 
-            this.head = this.scene.getObjectByName('head');
-            this.bone = this.scene.getObjectByName('bone');
-            this.tail = [this.head, this.bone];
+            loaded = true;
+
+            head = scene.getObjectByName('head');
+            bone = scene.getObjectByName('bone');
+            head.position.set(rayPos.x, rayPos.y, rayPos.z);
+            bone.position.set(rayPos.x, rayPos.y, rayPos.z);
+            tail = [head, bone];
             // TODO: scale bone as 0 from a curve
-            this.boneCount = 100;
-            this.boneOffset = 5;
-            for(var i = 0; i < this.boneCount; i++){
-                var clone = this.bone.clone(true);
-                this.tail.push(clone);
+            for(var i = 0; i < boneCount; i++){
+                var clone = bone.clone(true);
+                tail.push(clone);
                 var position = clone.position;
-                position = new THREE.Vector3(position.x,position.y,position.z + (i* this.boneOffset));
+                position = new THREE.Vector3(position.x,position.y,position.z + (i* boneOffset));
                 clone.position.set(position.x, position.y, position.z);
-                this.scene.add(clone);
-                //TODO: scale bone along curve
+                var t = THREE.MathUtils.mapLinear(i, 0, boneCount, 0,1);
+                var curveValue = curve.getPoint(t);
+                clone.scale.set(curveValue.y, curveValue.y, curveValue.y);
+                scene.add(clone);
             }
-
-            this.target = new THREE.Vector3();
-
         } );
 
-
-
+        var target = new THREE.Vector3();
+        var lerpTarget = new THREE.Vector3();
         // clock to get frame times for animation
-        this.clock = new THREE.Clock();
+        var clock = new THREE.Clock();
+        var pickPosition = {x: 0, y: 0};
+        clearPickPosition();
 
-        // // Creating a GUI
-        // this.gui = new dat.GUI();
-        //
-        // this.position = {posX:0, posY:0, posZ:0};
-        // this.gui.add(this.position, 'posX').onChange((value)=>{
-        //     this.position.posX = value;
-        // });
-        // this.gui.add(this.position, 'posY').onChange((value)=>{
-        //     this.position.posY = value;
-        // });
-        // this.gui.add(this.position, 'posZ').onChange((value)=>{
-        //     this.position.posZ = value;
-        // });
-        //
-        // this.rotation = {rotX:0, rotY:0, rotZ:0};
-        // this.gui.add(this.rotation, 'rotX').onChange((value)=>{
-        //     this.rotation.rotX = value;
-        // });
-        // this.gui.add(this.rotation, 'rotY').onChange((value)=>{
-        //     this.rotation.rotY = value;
-        // });
-        // this.gui.add(this.rotation, 'rotZ').onChange((value)=>{
-        //     this.rotation.rotZ = value;
-        // });
+        document.addEventListener('mousemove', setPickPosition);
+        document.addEventListener('mouseout', clearPickPosition);
+        document.addEventListener('mouseleave', clearPickPosition);
 
+        var time = 0;
+        startAnimationLoop();
 
-        this.pickPosition = {x: 0, y: 0};
-        this.clearPickPosition();
-        this.canvas = this.renderer.domElement;
+        function startAnimationLoop () {
 
-        window.addEventListener('mousemove', this.setPickPosition);
-        window.addEventListener('mouseout', this.clearPickPosition);
-        window.addEventListener('mouseleave', this.clearPickPosition);
-        this.time = 0;
-    };
+            renderer.render( scene, camera );
+            var requestID = window.requestAnimationFrame(startAnimationLoop);
 
-    startAnimationLoop = () => {
+            if(loaded){
 
-        this.renderer.render( this.scene, this.camera );
-        this.requestID = window.requestAnimationFrame(this.startAnimationLoop);
-
-        // console.log('pos', this.camera.position);
-        // console.log('rot', this.camera.rotation);
-
-        if(this.loaded){
-
-            if(this.time > 1)
-                this.time = 0;
-            this.time += this.clock.getDelta() * 0.1;
-            this.target = this.curves.curves.uniform.getPoint(this.time)
-            // var normalizedPosition = this.pickPosition;
-            // this.raycaster = new THREE.Raycaster();
-            // // cast a ray through the frustum
-            // this.raycaster.setFromCamera(normalizedPosition, this.camera);
-            // var distance = new THREE.Vector3(this.camera.position.x, 0, this.camera.position.z);
-            // distance = distance.distanceTo(this.camera.position);
-            // this.raycaster.ray.at(distance, this.target);
-            this.head.lookAt(this.target);
-            this.head.position.set(this.target.x, this.target.y, this.target.z);
-            this.tail[1].lookAt(this.head.position);
-            var tailDistance = this.tail[1].position.distanceTo(this.head.position);
-            this.tail[1].translateZ(tailDistance);
-            for(var i = 2; i < this.boneCount; i++){
-                this.tail[i].lookAt(this.tail[i-1].position);
-                var boneDistance  = this.tail[i].position.distanceTo(this.tail[i-1].position);
-                var min = 0;
-                var max = boneDistance;
-                var t = THREE.MathUtils.mapLinear(tailDistance, min, max, 0, 1);
-                var value = THREE.MathUtils.lerp(0, max, t);
-                if(boneDistance > this.boneOffset)
-                    this.tail[i].translateZ(value);
-
-                // console.log(tailDistance, boneDistance, this.boneOffset, t, value);
-
+                time += clock.getDelta();
+                lerpTarget.lerp(target, 0.01);
+                var distance = head.position.distanceTo(target);
+                if(distance < 100){
+                    var pos = new THREE.Vector2(THREE.MathUtils.randFloat(-1,1), THREE.MathUtils.randFloat(-1,1));
+                    raycaster.setFromCamera( pos, camera );
+                    target = raycaster.ray.at(THREE.MathUtils.randFloat(200, 400));
+                }
+                var normalizedPosition = pickPosition;
+                raycaster.setFromCamera(normalizedPosition, camera);
+                var distance = target.distanceTo(camera.position);
+                head.lookAt(lerpTarget);
+                head.translateZ(1);
+                tail[1].lookAt(head.position);
+                tail[1].translateZ(1);
+                for(var i = 2; i < boneCount; i++){
+                    tail[i].lookAt(tail[i-1].position);
+                    var boneDistance = tail[i].position.distanceTo(tail[i-1].position);
+                    tail[i].translateZ(boneDistance * 0.1);
+                }
             }
         }
-    };
+        handleWindowResize();
+        window.addEventListener('resize', handleWindowResize);
+        function handleWindowResize() {
 
-    getCanvasRelativePosition = (event) => {
-        const rect = this.canvas.getBoundingClientRect();
-        return {
-            x: (event.clientX - rect.left) * this.canvas.width  / rect.width,
-            y: (event.clientY - rect.top ) * this.canvas.height / rect.height,
-        };
+            const width = window.innerWidth;
+            const height = window.outerHeight;
+
+            renderer.setSize( width, height );
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+
+        }
+
+        function getCanvasRelativePosition(event){
+            const rect = renderer.domElement.getBoundingClientRect();
+            var vec2 = {x: event.clientY, y: event.clientX}
+            return getCanvasPosition(rect, vec2);
+        }
+
+        function getCanvasPosition(rect, vec2){
+            return {
+                x: (vec2.x - rect.left) * renderer.domElement.width  / rect.width,
+                y: (vec2.y - rect.top ) * renderer.domElement.height / rect.height,
+            };
+        }
+
+        function setPickPosition(event){
+            const pos = getCanvasRelativePosition(event);
+            pickPosition.x = (pos.x / renderer.domElement.width ) *  2 - 1;
+            pickPosition.y = (pos.y / renderer.domElement.height) * -2 + 1;  // note we flip Y
+        }
+
+        function clearPickPosition() {
+            // unlike the mouse which always has a position
+            // if the user stops touching the screen we want
+            // to stop picking. For now we just pick a value
+            // unlikely to pick something
+            pickPosition.x = -100000;
+            pickPosition.y = -100000;
+        }
     }
 
-    setPickPosition = (event) => {
-        const pos = this.getCanvasRelativePosition(event);
-        this.pickPosition.x = (pos.x / this.canvas.width ) *  2 - 1;
-        this.pickPosition.y = (pos.y / this.canvas.height) * -2 + 1;  // note we flip Y
-    }
+    componentWillUnmount() {
 
-    clearPickPosition = () => {
-        // unlike the mouse which always has a position
-        // if the user stops touching the screen we want
-        // to stop picking. For now we just pick a value
-        // unlikely to pick something
-        this.pickPosition.x = -100000;
-        this.pickPosition.y = -100000;
-    }
+        window.removeEventListener('resize', this.handleWindowResize);
+        window.cancelAnimationFrame(this.requestID);
 
+    }
 
     render() {
         const three = {

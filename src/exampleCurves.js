@@ -17,7 +17,7 @@ export default class ExampleCurves {
         var onUpPosition = new THREE.Vector2();
         var onDownPosition = new THREE.Vector2();
 
-        var boxGeometry = new THREE.BoxBufferGeometry( 10, 10, 10);
+        var boxGeometry = new THREE.BoxBufferGeometry( 0.1, 0.1, 0.1);
         var transformControl;
 
         var ARC_SEGMENTS = 200;
@@ -29,6 +29,7 @@ export default class ExampleCurves {
             tension: 0.5,
             centripetal: true,
             chordal: true,
+            showCurve: true,
             addPoint: addPoint,
             removePoint: removePoint,
             exportSpline: exportSpline
@@ -47,6 +48,7 @@ export default class ExampleCurves {
             return str;
 
         };
+
 
         scene.add( new THREE.AmbientLight( 0xf0f0f0 ) );
         var light = new THREE.SpotLight( 0xffffff, 1.5 );
@@ -69,12 +71,12 @@ export default class ExampleCurves {
         plane.receiveShadow = true;
         scene.add( plane );
 
+
         var helper = new THREE.GridHelper( 2000, 100 );
         helper.position.y = - 199;
         helper.material.opacity = 0.25;
         helper.material.transparent = true;
         scene.add( helper );
-
 
         renderer.shadowMap.enabled = true;
 
@@ -99,6 +101,9 @@ export default class ExampleCurves {
             gui.add( params, 'addPoint' );
             gui.add( params, 'removePoint' );
             gui.add( params, 'exportSpline' );
+            gui.add( params, 'showCurve' ).onChange((value)=>{
+                update()
+            });
             gui.open();
         }
 
@@ -188,7 +193,6 @@ export default class ExampleCurves {
             var material = new THREE.MeshLambertMaterial( { color: '#000000'
             } );
             var object = new THREE.Mesh( boxGeometry, material );
-            console.log(object);
 
             if ( position ) {
 
@@ -201,7 +205,6 @@ export default class ExampleCurves {
                 object.position.z = Math.random();
 
             }
-            console.log(scene);
 
             object.castShadow = true;
             object.receiveShadow = true;
@@ -309,6 +312,9 @@ export default class ExampleCurves {
             splines.uniform.mesh.visible = params.uniform;
             splines.centripetal.mesh.visible = params.centripetal;
             splines.chordal.mesh.visible = params.chordal;
+            // for(var i = 0; i < splineHelperObjects.length; i++){
+            //     splineHelperObjects[i].visible = params.showCurve;
+            // }
         }
 
         function onPointerDown( event ) {
